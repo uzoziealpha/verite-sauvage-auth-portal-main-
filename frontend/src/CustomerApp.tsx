@@ -31,7 +31,10 @@ export default function CustomerApp() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const pid = params.get("id");
+    const code = params.get("code");
+
     if (pid) setProductId(pid);
+    if (code) setShortCode(code.toUpperCase());
   }, []);
 
   // -------- QR handling (live camera) --------

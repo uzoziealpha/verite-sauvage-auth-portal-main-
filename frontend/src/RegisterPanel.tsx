@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Web3 from "web3";
 import QRCode from "qrcode";
 import { loadContract } from "./useContract";
+import { fetchJSON, BACKEND } from "./api";
 
 // Admin-side options for VS products
 const COLOR_OPTIONS = ["Elephant Gray", "Black", "White", "Brown"];
@@ -15,10 +16,14 @@ const MATERIAL_OPTIONS = [
 ];
 
 // Public verification frontend base URL (used in QR deep link)
-// For local dev, you can point this to your frontend-public dev server.
-// For production, set VITE_PUBLIC_VERIFY_BASE in .env.
 const PUBLIC_VERIFY_BASE =
-  import.meta.env.VITE_PUBLIC_VERIFY_BASE || "http://localhost:5173";
+  import.meta.env.VITE_PUBLIC_VERIFY_BASE || "http://localhost:5173/verify";
+
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
 
 export default function RegisterPanel({
   account,
@@ -35,6 +40,15 @@ export default function RegisterPanel({
     year: "",
   });
   const [busy, setBusy] = useState(false);
+  const [lastResult, setLastResult] = useState<{
+    productId: string | null;
+    shortCode: string | null;
+    error?: string | null;
+  }>({
+    productId: null,
+    shortCode: null,
+    error: null,
+  });
 
   const change = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -44,74 +58,155 @@ export default function RegisterPanel({
       [e.target.name]: e.target.value,
     }));
 
-  const register = async () => {
-    if (!account) return alert("Connect MetaMask first");
-    if (!form.name || !form.price) {
-      return alert("Name and price are required");
-    }
-    if (!form.color || !form.material) {
-      return alert("Please select both color and material");
-    }
-
+  async function register() {
+    if (busy) return;
     setBusy(true);
+    setLastResult({ productId: null, shortCode: null, error: null });
+
     try {
+      if (!window.ethereum) {
+        alert("MetaMask (or another Web3 wallet) is required.");
+        return;
+      }
+
+      // 1) Connect Web3 + MetaMask
       const web3 = new Web3(window.ethereum as any);
+      await window.ethereum.request({ method: "eth_requestAccounts" });
+      const accounts = await web3.eth.getAccounts();
+      const from = account || accounts[0];
+
+      if (!from) {
+        throw new Error("No Ethereum account available.");
+      }
+
+      // 2) Prepare product fields
+      const name = form.name.trim();
+      const color = form.color.trim();
+      const material = form.material.trim();
+
+      if (!name) {
+        alert("Please enter a Product / Model Name.");
+        return;
+      }
+
+      const rawPrice = form.price.replace(/[^\d]/g, "");
+      const price = rawPrice ? parseInt(rawPrice, 10) : 0;
+      const year = form.year ? parseInt(form.year, 10) : new Date().getFullYear();
+
+      // 3) Compute productId bytes32 (must match Solidity's keccak256)
+      const idHex = web3.utils.soliditySha3(
+        { type: "string", value: name },
+        { type: "string", value: color },
+        { type: "string", value: material },
+        { type: "uint256", value: price.toString() },
+        { type: "uint256", value: year.toString() }
+      ) as string | null;
+
+      if (!idHex) {
+        throw new Error("Failed to compute productId hash.");
+      }
+
+      console.log("[Admin] productId:", idHex);
+
+      // 4) Load contract and send uploadProduct tx
       const contract = await loadContract(web3);
-      const now = Math.floor(Date.now() / 1000);
 
-      // Deterministic-ish productId based on provided fields + timestamp
-      const productId = web3.utils.soliditySha3(
-        { type: "string", value: form.name },
-        { type: "string", value: form.color || "" },
-        { type: "string", value: form.material || "" },
-        { type: "uint256", value: form.price },
-        { type: "uint256", value: form.year || "0" },
-        { type: "uint256", value: String(now) }
-      )!;
-
+      console.log("[Admin] Sending uploadProduct tx...");
       await contract.methods
-        .uploadProduct(
-          productId,
-          form.name,
-          form.color || "",
-          form.material || "",
-          web3.utils.toBN(form.price),
-          Number(form.year || 0)
-        )
-        .send({ from: account });
+        .uploadProduct(idHex, name, color, material, price, year)
+        .send({ from });
 
-      // ✅ QR now points to the PUBLIC verification frontend, not backend API
-      const verifyUrl = `${PUBLIC_VERIFY_BASE}/?id=${productId}`;
+      console.log("[Admin] uploadProduct tx confirmed.");
 
-      const dataUrl = await QRCode.toDataURL(verifyUrl, { width: 420 });
-      onQr(dataUrl, productId);
-      alert(`Registered. Product ID:\n${productId}`);
-    } catch (e: any) {
-      alert(e.message || "Transaction failed");
+      // 5) Register a VS security code in codes.json via backend
+      //    This ensures the customer /customer-verify flow will work.
+      console.log("[Admin] Calling /codes/register to store VS code…");
+      const codeRes = await fetchJSON(`${BACKEND}/codes/register`, {
+        method: "POST",
+        body: JSON.stringify({
+          product_id: idHex,
+        }),
+      });
+
+      const shortCode: string = codeRes.shortCode;
+
+      console.log("[Admin] Stored VS code:", shortCode);
+
+      // 6) Build public verify URL (for customer QR)
+      //    In production: https://www.verify.veritesauvage.com/verify?code=VSXXXX
+      const verifyUrl = `${PUBLIC_VERIFY_BASE}?code=${encodeURIComponent(
+        shortCode
+      )}`;
+
+      // 7) Generate QR PNG on the client for that URL
+      const dataUrl = await QRCode.toDataURL(verifyUrl, {
+        errorCorrectionLevel: "H",
+        margin: 2,
+        width: 512,
+      });
+
+      // 8) Show QR in admin UI + allow download
+      onQr(dataUrl, idHex);
+
+      setLastResult({
+        productId: idHex,
+        shortCode,
+        error: null,
+      });
+    } catch (err: any) {
+      console.error("[Admin] Register error:", err);
+      setLastResult({
+        productId: null,
+        shortCode: null,
+        error: err?.message || String(err),
+      });
+      alert(`Failed to register product: ${err?.message || String(err)}`);
     } finally {
       setBusy(false);
     }
-  };
+  }
 
   return (
     <div className="card">
-      <h2>Register Product</h2>
+      <h2>Register Vérité Sauvage Product</h2>
 
-      {/* Name & Price */}
+      {account && (
+        <p style={{ fontSize: "0.8rem", color: "#6b7280", marginBottom: "0.5rem" }}>
+          Connected wallet: <span style={{ fontWeight: 500 }}>{account}</span>
+        </p>
+      )}
+
+      <p style={{ fontSize: "0.85rem", color: "#6b7280", marginBottom: "1rem" }}>
+        This flow uses your MetaMask wallet to store a product fingerprint on-chain
+        and simultaneously register a private Vérité Sauvage security code in the
+        backend. A QR code is then generated that deep-links customers to the
+        official verification page.
+      </p>
+
+      {/* Name / Model */}
       <div className="row">
-        <input
-          name="name"
-          placeholder="Name"
-          onChange={change}
-          value={form.name}
-        />
-        <input
-          name="price"
-          placeholder="Price"
-          type="number"
-          onChange={change}
-          value={form.price}
-        />
+        <label style={{ flex: 1 }}>
+          Product / Model Name
+          <input
+            name="name"
+            placeholder="Vérité Sauvage Petit (Black) Crocodile & Bamboo Edition"
+            onChange={change}
+            value={form.name}
+          />
+        </label>
+      </div>
+
+      {/* Price */}
+      <div className="row">
+        <label style={{ flex: 1 }}>
+          Price (optional)
+          <input
+            name="price"
+            placeholder="$18,090.00"
+            onChange={change}
+            value={form.price}
+          />
+        </label>
       </div>
 
       {/* Color & Material (selectable) */}
@@ -130,7 +225,7 @@ export default function RegisterPanel({
             fontSize: "0.95rem",
           }}
         >
-          <option value="">Select color</option>
+          <option value="">Select Color</option>
           {COLOR_OPTIONS.map((c) => (
             <option key={c} value={c}>
               {c}
@@ -152,7 +247,7 @@ export default function RegisterPanel({
             fontSize: "0.95rem",
           }}
         >
-          <option value="">Select material</option>
+          <option value="">Select Material</option>
           {MATERIAL_OPTIONS.map((m) => (
             <option key={m} value={m}>
               {m}
@@ -163,13 +258,16 @@ export default function RegisterPanel({
 
       {/* Year */}
       <div className="row">
-        <input
-          name="year"
-          placeholder="Year (optional)"
-          type="number"
-          onChange={change}
-          value={form.year}
-        />
+        <label style={{ flex: 1 }}>
+          Year
+          <input
+            name="year"
+            placeholder="2025"
+            type="number"
+            onChange={change}
+            value={form.year}
+          />
+        </label>
       </div>
 
       {/* Submit */}
@@ -178,6 +276,53 @@ export default function RegisterPanel({
           {busy ? "Submitting…" : "Register + Generate QR"}
         </button>
       </div>
+
+      {/* Result summary */}
+      {lastResult.shortCode && !lastResult.error && (
+        <div
+          style={{
+            marginTop: "1rem",
+            padding: "0.75rem 1rem",
+            borderRadius: 12,
+            background: "#ecfdf5",
+            color: "#065f46",
+            fontSize: "0.85rem",
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>Code Generated</div>
+          <div>Product ID: {lastResult.productId}</div>
+          <div>VS Code: {lastResult.shortCode}</div>
+          <div style={{ marginTop: 4 }}>
+            QR deep link:{" "}
+            <code
+              style={{
+                fontSize: "0.75rem",
+                background: "#d1fae5",
+                padding: "0.15rem 0.3rem",
+                borderRadius: 6,
+              }}
+            >
+              {`${PUBLIC_VERIFY_BASE}?code=${lastResult.shortCode}`}
+            </code>
+          </div>
+        </div>
+      )}
+
+      {lastResult.error && (
+        <div
+          style={{
+            marginTop: "1rem",
+            padding: "0.75rem 1rem",
+            borderRadius: 12,
+            background: "#fef2f2",
+            color: "#b91c1c",
+            fontSize: "0.85rem",
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>Error</div>
+          <div>{lastResult.error}</div>
+        </div>
+      )}
     </div>
   );
 }

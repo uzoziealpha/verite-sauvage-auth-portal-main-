@@ -1,36 +1,21 @@
-# Node / frontend
-frontend/node_modules/
-frontend/dist/
-frontend/.vite/
-
-# Python / backend
-backend-python/.venv/
+# Python
+backend-python/.venv
 backend-python/__pycache__/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+backend-python/*.pyc
 
-# Env & secrets
+# Node
+frontend/node_modules
+solidity/node_modules
+frontend/dist
+solidity/artifacts
+solidity/cache
+
+# Env
 .env
-*.env
-*.secret
-*.key
-*.pem
-private_key.txt
+backend-python/.env
+frontend/.env
 
-# OS junk
+# OS / editor
 .DS_Store
-Thumbs.db
-
-# Logs
 *.log
-
-# Local data files
 backend-python/app/data/codes.json
-
-# OS/editor
-.DS_Store
-.idea
-.vscodesolidity.zip
-frontend.zip
