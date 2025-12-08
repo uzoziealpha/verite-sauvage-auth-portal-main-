@@ -1,0 +1,350 @@
+/* GLOBAL – bright luxury white theme */
+html, body {
+  margin: 0;
+    font-family: 'Inter', sans-serif;
+
+  color: #111827;
+
+  /* Boutique-style background: soft white with subtle warm gradients */
+  background-color: #f6f4f1;
+  background-image:
+    radial-gradient(circle at 20% 0%, rgba(255, 230, 200, 0.35), transparent 55%),
+    radial-gradient(circle at 85% 100%, rgba(230, 210, 190, 0.35), transparent 60%),
+    radial-gradient(circle at 0% 100%, rgba(255, 240, 220, 0.25), transparent 60%);
+  background-attachment: fixed;
+}
+
+.app-root {
+  min-height: 100vh;
+}
+
+/* MOBILE-FIRST LAYOUT (default) */
+.container {
+  max-width: 100%;
+  margin: 1.5rem auto 2.5rem;
+  padding: 0 1rem;
+}
+
+/* Card styling – white panels with soft shadows & gold touch */
+.card {
+  background: #ffffff;
+  border-radius: 22px;
+  padding: 1.5rem 1.75rem;
+  margin-bottom: 1.25rem;
+
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow:
+    0 14px 40px rgba(15, 23, 42, 0.08),
+    0 0 0 1px rgba(255, 255, 255, 0.9);
+}
+
+/* Header */
+.header-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+/* Brand row: logo + text */
+.brand {
+  display: flex;
+  gap: 0.9rem;
+  align-items: center;
+}
+
+/* Logo container – bright gold badge on white */
+.brand-logo-wrap {
+  width: 120px;
+  height: 120px;
+  border-radius: 32px;
+  background: radial-gradient(circle at 50% 35%, #ffe6b0, #e0b865 62%, #f3ede4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(255, 255, 255, 0.9);
+  flex-shrink: 0;
+}
+
+.brand-logo {
+  width: 90px;
+  height: 90px;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 6px 12px rgba(0, 0, 0, 0.4))
+    drop-shadow(0 0 10px rgba(255, 220, 170, 0.8));
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.brand-title {
+  margin: 0;
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 600;
+  font-size: 2.1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+}
+
+.brand-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  color: #6b6f75;
+  letter-spacing: 0.01em;
+}
+
+
+/* Wallet row */
+.header-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.wallet-status {
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+/* MAIN GRID – on mobile: single column, QR below forms */
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.qr-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Typography inside cards */
+.card h1,
+.card h2,
+.card h3 {
+  margin-top: 0;
+}
+
+.card h2 {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 500;
+  font-size: 1.45rem;
+  color: #1c1c1c;
+}
+
+
+/* Form rows */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.75rem;
+}
+
+/* Inputs – white, pill-shaped, subtle inner shadow */
+input {
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;  
+  flex: 1 1 100%;
+  min-width: 0;
+  padding: 0.65rem 0.95rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  background: #ffffff;
+  color: #111827;
+  outline: none;
+  font-size: 0.95rem;
+  box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.08);
+  transition: border 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+input::placeholder {
+  color: #9ca3af;
+}
+
+input:focus {
+  border-color: #f4c96a;
+  box-shadow:
+    0 0 0 1px rgba(244, 201, 106, 0.55),
+    inset 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+/* Buttons – gold pill buttons with soft shadows */
+button {
+font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.02em;  
+  flex: 1 1 100%;
+  padding: 0.7rem 1.4rem;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #ffe29f, #f6c453);
+  color: #1f2933;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  box-shadow:
+    0 8px 18px rgba(233, 186, 120, 0.55),
+    0 0 0 1px rgba(250, 230, 190, 0.8);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow:
+    0 14px 26px rgba(233, 186, 120, 0.7),
+    0 0 0 1px rgba(249, 222, 189, 0.9);
+  filter: brightness(1.04);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* QR image scaling for small screens */
+.qr-column img,
+.qr-column canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+/* JSON output – light grey panel */
+pre {
+  margin-top: 0.75rem;
+  padding: 0.8rem 1rem;
+  background: #f3f4f6;
+  border-radius: 14px;
+  border: 1px solid rgba(209, 213, 219, 0.9);
+  font-size: 0.8rem;
+  color: #111827;
+  max-height: 260px;
+  overflow: auto;
+}
+
+/* Footer */
+.footer {
+  margin-top: 1.5rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+  text-align: center;
+}
+
+/* TABLET (≥ 640px) */
+@media (min-width: 640px) {
+  .container {
+    max-width: 640px;
+    padding: 0 1.25rem 2.75rem;
+  }
+
+  .brand-title {
+    font-size: 1.9rem;
+  }
+
+  .row {
+    flex-wrap: nowrap;
+  }
+
+  input {
+    flex: 1 1 auto;
+  }
+
+  button {
+    flex: 0 0 auto;
+  }
+}
+
+/* DESKTOP / LARGE TABLET (≥ 900px) */
+@media (min-width: 900px) {
+  .container {
+    max-width: 1100px;
+    margin-top: 2.5rem;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(260px, 1.3fr);
+    gap: 1.1rem;
+    align-items: flex-start;
+  }
+
+  .qr-column {
+    margin-top: 0;
+  }
+
+  .brand-title {
+    font-size: 2rem;
+  }
+}
+
+/* ───────────────────────────── */
+/* LUXURY TYPOGRAPHY UPGRADE     */
+/* ───────────────────────────── */
+
+/* Global */
+body, html {
+  font-family: 'Inter', sans-serif;
+  color: #1a1a1a;
+}
+
+/* Luxury Serif Title (Cartier-like) */
+.brand-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 600;
+  font-size: 2.1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+}
+
+/* Subtitle (Dior/Chanel clean look) */
+.brand-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  color: #6b6f75;
+  letter-spacing: 0.01em;
+}
+
+/* Card Headings */
+.card h2 {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 500;
+  font-size: 1.45rem;
+  color: #222;
+}
+
+/* Inputs */
+input {
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+}
+
+/* Buttons */
+button {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* JSON Display */
+pre {
+  font-family: 'Inter', monospace;
+}

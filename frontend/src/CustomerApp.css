@@ -1,0 +1,636 @@
+/* src/CustomerApp.css */
+
+:root {
+  --vs-gold: #f9d47a;
+  --vs-gold-soft: #fde68a;
+  --vs-border-soft: rgba(148, 163, 184, 0.35);
+  --vs-text-main: #1b1b1d;
+  --vs-text-sub: #6b7280;
+}
+
+/* Root background – luxury grey */
+
+.vs-auth-root {
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, #b3b3b5 0%, #9b9ca0 40%, #7c7c80 100%);
+  color: var(--vs-text-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
+    "SF Pro Text", sans-serif;
+}
+
+.vs-auth-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+      circle at 15% 0%,
+      rgba(255, 255, 255, 0.3),
+      transparent 60%
+    ),
+    radial-gradient(circle at 90% 15%, rgba(246, 220, 135, 0.35), transparent 65%);
+}
+
+/* Decorative side images (update URLs to your bag photos) */
+
+.vs-side-image {
+  position: absolute;
+  border-radius: 26px;
+  background-size: cover;
+  background-position: center;
+  filter: grayscale(10%) brightness(1.05);
+  opacity: 0.92;
+  border: 2px solid rgba(240, 215, 120, 0.6);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  z-index: 0;
+}
+
+/* Desktop / large laptop */
+
+.vs-side-image--left {
+  left: 4%;
+  bottom: 8%;
+  width: 260px;
+  height: 200px;
+  background-image: url("/vs-bag-left.jpg");
+}
+
+.vs-side-image--right {
+  right: 4%;
+  bottom: 12%;
+  width: 260px;
+  height: 200px;
+  background-image: url("/vs-bag-right.jpg");
+}
+
+/* Tablet / small laptop */
+
+@media (max-width: 1024px) {
+  .vs-side-image--left {
+    left: 2%;
+    bottom: 6%;
+    width: 210px;
+    height: 160px;
+  }
+
+  .vs-side-image--right {
+    right: 2%;
+    bottom: 8%;
+    width: 210px;
+    height: 160px;
+  }
+}
+
+/* Mobile – keep them small in corners so layout isn't broken */
+
+@media (max-width: 720px) {
+  .vs-side-image--left {
+    width: 120px;
+    height: 90px;
+    left: -10px;
+    bottom: 20%;
+    opacity: 0.85;
+  }
+
+  .vs-side-image--right {
+    width: 120px;
+    height: 90px;
+    right: -10px;
+    bottom: 5%;
+    opacity: 0.85;
+  }
+
+  .vs-auth-root {
+    padding: 16px 10px 20px;
+  }
+}
+
+/* Main shell */
+
+.vs-auth-shell {
+  position: relative;
+  z-index: 1;
+  max-width: 1120px;
+  width: 100%;
+}
+
+/* Header */
+
+.vs-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+/* Trending logo pill / glassmorphism */
+
+.vs-logo-pill {
+  position: relative;
+  display: inline-flex;
+  padding: 6px;
+  border-radius: 999px;
+  background: radial-gradient(circle at top left, #fef9c3, #fbbf24 45%, #854d0e);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  overflow: visible;
+}
+
+.vs-logo-pill-glow {
+  position: absolute;
+  inset: -10px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(250, 250, 250, 0.6), transparent);
+  opacity: 0.6;
+  filter: blur(14px);
+  pointer-events: none;
+}
+
+.vs-logo-pill-inner {
+  position: relative;
+  border-radius: 999px;
+  padding: 10px 18px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.96),
+    rgba(243, 244, 246, 0.9)
+  );
+  border: 1px solid rgba(209, 213, 219, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  backdrop-filter: blur(16px);
+}
+
+.vs-logo-img {
+  height: 66px;
+  width: auto;
+  object-fit: contain;
+}
+
+.vs-header-sub {
+  margin-top: 10px;
+  font-size: 0.9rem;
+  color: #6b7280;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 720px) {
+  .vs-logo-img {
+    height: 66px;
+  }
+
+  .vs-header-sub {
+    font-size: 0.78rem;
+  }
+}
+
+/* Main layout */
+
+.vs-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Card */
+
+.vs-card {
+  position: relative;
+  border-radius: 22px;
+  padding: 1px;
+  background: linear-gradient(135deg, #fce7a2 0%, #d6b24e 40%, #9a8033 100%);
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.35);
+}
+
+.vs-card-glow {
+  position: absolute;
+  inset: 0;
+  filter: blur(24px);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.vs-card-inner {
+  position: relative;
+  z-index: 1;
+  border-radius: 21px;
+  background: linear-gradient(180deg, #f4f4f6 0%, #dfdfe1 80%);
+  padding: 26px 32px 24px;
+  display: grid;
+  grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+  gap: 32px;
+}
+
+@media (max-width: 820px) {
+  .vs-card-inner {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 24px 18px 20px;
+  }
+}
+
+/* QR panel */
+
+.vs-qr-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.vs-qr-frame {
+width: 220px;
+height: 220px;
+border-radius: 20px;
+background: #ffffff;
+border: 2px solid #d8d8d8;
+overflow: hidden;
+position: relative;
+box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+display: flex;
+align-items: center;
+justify-content: center;
+}
+
+
+/* Scanner active mode: ensure camera preview fits fully */
+.vs-qr-frame video {
+object-fit: cover !important;
+width: 100% !important;
+height: 100% !important;
+display: block;
+}
+
+
+
+
+/* Placeholder */
+
+.vs-qr-placeholder {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at center, #f1f1f3 0, #e4e4e6 70%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vs-qr-border {
+  position: absolute;
+  inset: 18px;
+  border-radius: 12px;
+  border: 2px solid #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
+}
+
+.vs-qr-square {
+  width: 96px;
+  height: 96px;
+  border-radius: 12px;
+  border: 4px solid #111827;
+}
+
+.vs-qr-square--inner {
+  width: 46px;
+  height: 46px;
+  border-width: 3px;
+  position: absolute;
+}
+
+/* Uploaded QR preview */
+
+.vs-qr-uploaded {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vs-qr-uploaded img {
+max-width: 100%;
+max-height: 100%;
+display: block;
+object-fit: contain;
+border-radius: 10px;
+position: relative;
+}
+
+.vs-qr-border,
+.vs-qr-square,
+.vs-qr-square--inner,
+.vs-qr-overlay-border {
+position: absolute;
+border: 2px dashed rgba(0, 0, 0, 0.2);
+width: 90%;
+height: 90%;
+top: 5%;
+left: 5%;
+border-radius: 12px;
+pointer-events: none;
+z-index: 2;
+}
+
+.vs-qr-overlay-border {
+  position: absolute;
+  inset: 12px;
+  border-radius: 14px;
+  border: 2px solid #38bdf8;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.65);
+}
+
+/* Scanner close button */
+.vs-qr-close {
+position: absolute;
+top: 6px;
+right: 6px;
+background: rgba(255, 255, 255, 0.9);
+border: none;
+border-radius: 50%;
+width: 28px;
+height: 28px;
+font-size: 16px;
+cursor: pointer;
+z-index: 3;
+}
+
+
+/* QR actions */
+
+.vs-qr-actions {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  align-items: center;
+}
+
+.vs-ghost-btn {
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.9);
+  background: transparent;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  color: #111827;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease,
+    transform 0.08s ease;
+}
+
+.vs-ghost-btn:hover {
+  background: rgba(243, 244, 246, 0.9);
+  border-color: var(--vs-gold-soft);
+  transform: translateY(-1px);
+}
+
+.vs-ghost-btn--file input[type="file"] {
+  display: none;
+}
+
+.vs-scan-status {
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: var(--vs-text-sub);
+}
+
+.vs-qr-caption {
+  margin-top: 18px;
+  text-align: center;
+  font-size: 0.86rem;
+  color: #111827;
+}
+
+.vs-qr-caption span {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--vs-text-sub);
+  margin-top: 2px;
+}
+
+/* Form panel */
+
+.vs-form-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+}
+
+.vs-field-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vs-field-block--short {
+  margin-top: 4px;
+}
+
+.vs-field-label {
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9c8f62;
+}
+
+.vs-input {
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.8);
+  background: #f7f7f8;
+  padding: 10px 16px;
+  font-size: 0.86rem;
+  color: #111827;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vs-input::placeholder {
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.vs-input:focus {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.45);
+}
+
+.vs-input--short {
+  max-width: 220px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.vs-field-hint {
+  font-size: 0.75rem;
+  color: var(--vs-text-sub);
+}
+
+/* Primary button */
+
+.vs-primary-btn {
+  margin-top: 10px;
+  width: 100%;
+  border-radius: 999px;
+  border: none;
+  padding: 11px 20px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  color: #2d2d2d;
+  background: linear-gradient(180deg, #fce7a2 0%, #d6b24e 60%, #a37c27 100%);
+  box-shadow: 0 0 18px rgba(250, 204, 21, 0.55),
+    0 18px 40px rgba(0, 0, 0, 0.5);
+  transition: transform 0.08s ease, box-shadow 0.08s ease,
+    filter 0.08s ease, opacity 0.08s ease;
+}
+
+.vs-primary-btn:hover:not(:disabled) {
+  filter: brightness(1.03);
+  transform: translateY(-1px);
+  box-shadow: 0 0 24px rgba(250, 204, 21, 0.75),
+    0 22px 46px rgba(0, 0, 0, 0.6);
+}
+
+.vs-primary-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+/* Error */
+
+.vs-error-msg {
+  margin-top: 6px;
+  font-size: 0.74rem;
+  color: #b45309;
+}
+
+/* Verdict */
+
+.vs-verdict {
+  margin-top: 18px;
+  border-radius: 16px;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(212, 175, 55, 0.7);
+  font-size: 0.88rem;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+}
+
+.vs-verdict--ok {
+  border-color: rgba(212, 175, 55, 0.95);
+}
+
+.vs-verdict--bad {
+  border-color: rgba(212, 175, 55, 0.55);
+}
+
+.vs-verdict-title {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.vs-verdict-sub {
+  font-size: 0.82rem;
+  color: var(--vs-text-sub);
+}
+
+.vs-verdict-reason {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: #4b5563;
+}
+
+/* Details */
+
+.vs-details {
+  margin-top: 10px;
+  font-size: 0.8rem;
+}
+
+.vs-details-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--vs-text-sub);
+}
+
+.vs-details-pre {
+  margin: 0;
+  max-height: 200px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(243, 244, 246, 0.9);
+  border: 1px solid var(--vs-border-soft);
+  font-size: 0.75rem;
+}
+
+.vs-product-list {
+  list-style: none;
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--vs-border-soft);
+  font-size: 0.84rem;
+  line-height: 1.6;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.vs-product-item {
+  margin-bottom: 10px;
+  word-break: break-word;
+}
+
+.vs-product-key {
+  font-weight: 600;
+  color: #1f2937;
+  margin-right: 4px;
+  display: inline-block;
+  min-width: 90px;
+}
+
+.vs-product-value {
+  color: #4b5563;
+}
+
+/* Responsive tweaks */
+@media (max-width: 720px) {
+  .vs-product-list {
+    padding: 14px 16px;
+    font-size: 0.8rem;
+  }
+
+  .vs-product-key {
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .vs-product-item {
+    margin-bottom: 12px;
+  }
+}
+
+
+/* Footer */
+
+.vs-footer {
+  margin-top: 18px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--vs-text-sub);
+}
+

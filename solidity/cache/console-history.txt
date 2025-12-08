@@ -1,0 +1,22 @@
+await c.getProduct("0x1ade830a800972d87c277b645589e3e878b6bcee6c811b6bd40a9c64143dde8c");
+const c = await ethers.getContractAt("FakeProdDetector", addr);
+const addr = artifact.networks["31337"].address;
+const artifact = require('./dist/FakeProdDetector.json');
+});  value: ethers.parseEther("5.0"),  to: "0xa2BB67a5912D742B052Bf1ad4CEe47E4FC3F747C",await faucet.sendTransaction({
+const [faucet] = await ethers.getSigners();
+});  value: ethers.parseEther("5.0"),  to: "0xa2BB67a5912D742B052Bf1ad4CEe47E4FC3F747C",await faucet.sendTransaction({
+const [faucet] = await ethers.getSigners();
+ethers.formatEther(await ethers.provider.getBalance(addr));
+await ethers.provider.getBalance(addr);
+const addr = "0xa2BB67a5912D742B052Bf1ad4CEe47E4FC3F747C";
+ethers.formatEther(await ethers.provider.getBalance("0xa2BB67a5912D742B052Bf1ad4CEe47E4FC3F747C"))
+(await ethers.provider.getBalance("0xa2BB67a5912D742B052Bf1ad4CEe47E4FC3F747C")).toString()
+ethers.formatEther(await ethers.provider.getBalance("0xa2BB67a5912D742B052Bf1ad4CEe47E4FC3F747C"))
+(await ethers.provider.getBalance("0xa2BB67a5912D742B052Bf1ad4CEe47E4FC3F747C")).toString()
+ethers.formatEther(await ethers.provider.getBalance(addr))
+(await ethers.provider.getBalance(addr)).toString()
+const addr = "0xa2BB67a5912D742B052Bf1ad4CEe47E4FC3F747C";67a5912D742B052Bf1ad4CEe47E4FC3F747C"))
+(await ethers.provider.getBalance("0xa2BB67a5912D742B052Bf1ad4CEe47E4FC3F747C")).toString()
+ethers.formatEther(await ethers.provider.getBalance(addr))
+(await ethers.provider.getBalance(addr)).toString()
+const addr = "0xa2BB67a5912D742B052Bf1ad4CEe47E4FC3F747C";
