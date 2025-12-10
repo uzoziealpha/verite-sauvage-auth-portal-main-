@@ -1,151 +1,156 @@
 # backend-python/app/routes/customer_verify.py
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
-from pathlib import Path
-import json
-from datetime import datetime, timezone
 
-from web3.exceptions import BadFunctionCallOutput
-
-from app.data.seed_codes import check_short_code, get_short_code_for_product
-from app.services.web3loader import get_web3, get_contract
+from app.data.seed_codes import (
+    check_short_code,
+    get_short_code_for_product,
+    get_meta_for_product,
+)
 
 router = APIRouter()
-
-# ----------------- helpers for codes.json (for GET flow) --------------------
-
-CODES_PATH = Path(__file__).resolve().parents[1] / "data" / "codes.json"
-
-
-def _load_codes() -> Dict[str, Any]:
-    if not CODES_PATH.exists():
-        return {}
-    with CODES_PATH.open("r", encoding="utf-8") as f:
-        try:
-            return json.load(f)
-        except json.JSONDecodeError:
-            return {}
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def _fetch_onchain_product(product_id: str) -> Dict[str, Any]:
-    """
-    Helper: load product fields from the Solidity contract.
-
-    Solidity function:
-
-        function getProduct(bytes32 id) public view returns (
-            string memory name,
-            string memory color,
-            string memory material,
-            uint256 price,
-            uint256 year
-        );
-
-    If anything fails, we return an empty dict.
-    """
-    try:
-        web3 = get_web3()
-        contract = get_contract(web3)
-        raw = contract.functions.getProduct(product_id).call()
-
-        if not isinstance(raw, (list, tuple)) or len(raw) < 5:
-            return {}
-
-        name = raw[0] or ""
-        color = raw[1] or ""
-        material = raw[2] or ""
-        price = int(raw[3]) if raw[3] is not None else 0
-        year = int(raw[4]) if raw[4] is not None else 0
-
-        # If fully empty, treat as "no record"
-        if name == "" and price == 0:
-            return {}
-
-        return {
-            "name": name,
-            "color": color,
-            "material": material,
-            "price": price,
-            "year": year,
-        }
-    except BadFunctionCallOutput:
-        # Wrong contract / ABI / network
-        return {}
-    except Exception:
-        return {}
-
-
-# --------------------------- POST (productId + code) ------------------------
 
 
 class CustomerVerifyRequest(BaseModel):
     product_id: str = Field(..., description="Product ID (0x + 64 hex chars)")
     short_code: str = Field(
-        ..., description="VS security code (e.g.VSP9GL or 6-char code)"
+        ..., description="6-character VS Security Code (e.g. VS2BOF)"
     )
 
 
+def _derive_size_from_name(name: str) -> str:
+    """
+    Very simple size heuristic based on the product name.
+
+    Examples:
+      - "Vérité Sauvage Petit (Black) ..." -> "Petit"
+      - "Vérité Sauvage Mini ..."         -> "Mini"
+      - "Vérité Sauvage Grand ..."        -> "Grand"
+    """
+    n = (name or "").lower()
+    if "petit" in n:
+        return "Petit"
+    if "mini" in n:
+        return "Mini"
+    if "grand" in n or "large" in n:
+        return "Grand"
+    return ""
+
+
+def _derive_serial_from_pid(pid: str) -> str:
+    """
+    Derive a deterministic serial code from the productId bytes32.
+
+    e.g. 0x....ABC123 -> VS-ABC123
+    """
+    if pid.startswith("0x"):
+        hex_part = pid[2:]
+    else:
+        hex_part = pid
+
+    tail = hex_part[-6:].upper()
+    return f"VS-{tail}"
+
+
 @router.post("/customer-verify")
-def customer_verify_post(body: CustomerVerifyRequest):
+def customer_verify(body: CustomerVerifyRequest):
     """
-    Customer-facing verification used when both productId + short_code
-    are provided (your current UI when both fields are filled).
+    Public customer verification endpoint.
 
-    - Uses codes.json for authenticity.
-    - If authentic, enriches the product with on-chain bag details.
+    Requirements for AUTHENTIC:
+
+      1) VS Security Code in codes.json matches 'short_code' for this product
+      2) codes.json has a record for this productId (created by admin /verify step)
+
+    We treat codes.json as the source of truth for customer checks. On-chain
+    verification still happens in the admin flow when you click "Verify Vérité
+    Sauvage Product", which writes both the VS code and metadata into codes.json.
+
+    If checks pass, we return a rich product object:
+
+        {
+          "productId": "...",
+          "vsCode": "VS2Q25",
+          "model": "...",
+          "color": "Black",
+          "material": "Crocodile",
+          "price": 1809000,
+          "year": 2025,
+          "size": "Petit",
+          "serial": "VS-ABC123"
+        }
     """
-
     pid = body.product_id.strip()
-    code = body.short_code.strip()
+    short_code = body.short_code.strip()
 
-    if not pid or not code:
+    # ---- basic validation of productId -------------------------------------
+    if not pid:
+        raise HTTPException(status_code=400, detail="product_id cannot be empty.")
+
+    if not pid.startswith("0x") or len(pid) != 66:
         raise HTTPException(
             status_code=400,
-            detail="product_id and short_code are required",
+            detail="Invalid product_id. Must be 0x + 64 hex characters.",
         )
 
-    # 1) Check against stored VS code
-    is_match = check_short_code(pid, code)
-    stored = get_short_code_for_product(pid)
+    if len(short_code) < 4:
+        raise HTTPException(
+            status_code=400,
+            detail="short_code must be at least 4 characters.",
+        )
 
-    if stored is None:
-        verdict = {
-            "status": "fake",
-            "reason": "no_vs_code_stored_for_product_id",
+    # ---- on-disk VS code check (source of truth for customers) -------------
+    code_ok = check_short_code(pid, short_code)
+    if not code_ok:
+        product = {
+            "productId": pid,
+            "vsCode": short_code,
         }
-        return {
-            "success": False,
-            "product": {"productId": pid},
-            "verdict": verdict,
-        }
-
-    if not is_match:
         verdict = {
             "status": "fake",
             "reason": "vs_code_mismatch_for_product_id",
         }
         return {
             "success": False,
-            "product": {"productId": pid},
+            "product": product,
             "verdict": verdict,
         }
 
-    # 2) Authentic → base product payload
-    product: Dict[str, Any] = {
+    # If we reach here, the code matches what we stored earlier during admin verify.
+    stored_vs_code = get_short_code_for_product(pid) or short_code
+    meta = get_meta_for_product(pid)
+
+    # Build rich product payload from stored metadata (+ derived fields).
+    model = meta.get("model") or meta.get("name") or ""
+    color = meta.get("color") or ""
+    material = meta.get("material") or ""
+    price = int(meta["price"]) if "price" in meta and meta["price"] is not None else 0
+    year = int(meta["year"]) if "year" in meta and meta["year"] is not None else 0
+
+    size = meta.get("size") or _derive_size_from_name(model)
+    serial = meta.get("serial") or _derive_serial_from_pid(pid)
+
+    product = {
         "productId": pid,
-        "vsCode": stored,
+        "vsCode": stored_vs_code,
     }
 
-    # 3) Enrich from on-chain getProduct
-    onchain = _fetch_onchain_product(pid)
-    if onchain:
-        product.update(onchain)
+    # Only include fields that we actually know
+    if model:
+        product["model"] = model
+    if color:
+        product["color"] = color
+    if material:
+        product["material"] = material
+    if price:
+        product["price"] = price
+    if year:
+        product["year"] = year
+    if size:
+        product["size"] = size
+    if serial:
+        product["serial"] = serial
 
     verdict = {
         "status": "authentic",
@@ -156,81 +161,4 @@ def customer_verify_post(body: CustomerVerifyRequest):
         "success": True,
         "product": product,
         "verdict": verdict,
-    }
-
-
-# ------------------------ GET /customer-verify?code= ------------------------
-
-
-@router.get("/customer-verify")
-def customer_verify_get(
-    code: Optional[str] = Query(
-        None, description="VS code (e.g. VSP9GL, scanned from QR)"
-    ),
-    productId: Optional[str] = Query(
-        None, description="Internal productId (0x + 64 hex chars)"
-    ),
-):
-    """
-    QR / deep-link flow:
-
-    - /customer-verify?code=VSP9GL
-    - or /customer-verify?productId=0x...
-
-    Looks up codes.json and enriches with on-chain product details.
-    """
-
-    if not code and not productId:
-        raise HTTPException(
-            status_code=400,
-            detail="Provide either 'code' or 'productId'.",
-        )
-
-    codes = _load_codes()
-
-    record_pid: Optional[str] = None
-    stored_code: Optional[str] = None
-
-    # Lookup by short code
-    if code:
-        c = code.strip()
-        for pid, val in codes.items():
-            stored = str(val).strip()
-            if stored.lower() == c.lower():
-                record_pid = pid
-                stored_code = stored
-                break
-    else:
-        pid = productId.strip()
-        if pid in codes:
-            record_pid = pid
-            stored_code = str(codes[pid]).strip()
-
-    if not record_pid or not stored_code:
-        return {
-            "success": False,
-            "verdict": {
-                "status": "fake",
-                "reason": "code_or_product_not_found_in_codes_store",
-            },
-        }
-
-    # Base product payload
-    product: Dict[str, Any] = {
-        "productId": record_pid,
-        "vsCode": stored_code,
-    }
-
-    # Enrich from on-chain getProduct
-    onchain = _fetch_onchain_product(record_pid)
-    if onchain:
-        product.update(onchain)
-
-    return {
-        "success": True,
-        "verdict": {
-            "status": "authentic",
-            "reason": "code_found_in_codes_store",
-        },
-        "product": product,
     }
