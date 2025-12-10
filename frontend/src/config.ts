@@ -1,3 +1,6 @@
-// src/config.ts
-export const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
+// e.g. frontend/src/config.ts or inline in components
+const BACKEND_BASE_URL =
+  import.meta.env.VITE_BACKEND_BASE_URL || "http://127.0.0.1:4000";
+
+
+  export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;

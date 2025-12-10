@@ -1,9 +1,11 @@
-// src/CustomerApp.tsx
+// frontend/src/CustomerApp.tsx
+
 import React, { useEffect, useState } from "react";
-import { BACKEND, fetchJSON } from "./api";
+import { fetchJSON } from "./api";
 import { QrReader } from "react-qr-reader";
 import jsQR from "jsqr";
 import "./CustomerApp.css";
+import { BACKEND_BASE_URL } from "./config";
 
 type Verdict = {
   status: string;
@@ -27,7 +29,7 @@ export default function CustomerApp() {
   const [scanStatus, setScanStatus] = useState<string | null>(null);
   const [qrPreview, setQrPreview] = useState<string | null>(null);
 
-  // Auto-fill product ID from ?id= in QR link
+  // Auto-fill from ?id= and ?code= in QR deep link
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const pid = params.get("id");
@@ -47,7 +49,7 @@ export default function CustomerApp() {
 
     let extracted = data.trim();
 
-    // If the QR encodes a full URL, pull out ?id=
+    // If the QR encodes a full URL, try to pull out ?id= (legacy behaviour)
     try {
       const url = new URL(extracted);
       const pid = url.searchParams.get("id");
@@ -141,8 +143,10 @@ export default function CustomerApp() {
     setErrorMsg(null);
 
     try {
-      console.log("[CustomerApp] POST", `${BACKEND}/customer-verify`);
-      const data = (await fetchJSON(`${BACKEND}/customer-verify`, {
+      const url = `${BACKEND_BASE_URL}/customer-verify`;
+      console.log("[CustomerApp] POST", url);
+
+      const data = (await fetchJSON(url, {
         method: "POST",
         body: JSON.stringify({
           product_id: pid,
@@ -173,7 +177,7 @@ export default function CustomerApp() {
             ✅ Authentic Vérité Sauvage Product
           </div>
           <div className="vs-verdict-sub">
-            This item is verified on-chain with CITES compliance.
+            This item matches a registered Vérité Sauvage security code.
           </div>
           {reason && <div className="vs-verdict-reason">{reason}</div>}
         </div>
@@ -359,26 +363,29 @@ export default function CustomerApp() {
           {/* Verdict + details */}
           {renderVerdict()}
 
-{result?.product && (
-  <div className="vs-details">
-    <div className="vs-details-title">Product Details</div>
-    <ul className="vs-product-list">
-      {Object.entries(result.product).map(([key, value]) => {
-        const formatKey = (k: string) =>
-          k
-            .replace(/([A-Z])/g, " $1")
-            .replace(/^./, (s) => s.toUpperCase());
-        return (
-          <li key={key} className="vs-product-item">
-            <strong className="vs-product-key">{formatKey(key)}:</strong>{" "}
-            <span className="vs-product-value">{value.toString()}</span>
-          </li>
-        );
-      })}
-    </ul>
-  </div>
-)}
-
+          {result?.product && (
+            <div className="vs-details">
+              <div className="vs-details-title">Product Details</div>
+              <ul className="vs-product-list">
+                {Object.entries(result.product).map(([key, value]) => {
+                  const formatKey = (k: string) =>
+                    k
+                      .replace(/([A-Z])/g, " $1")
+                      .replace(/^./, (s) => s.toUpperCase());
+                  return (
+                    <li key={key} className="vs-product-item">
+                      <strong className="vs-product-key">
+                        {formatKey(key)}:
+                      </strong>{" "}
+                      <span className="vs-product-value">
+                        {value?.toString()}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </main>
 
         <footer className="vs-footer">
