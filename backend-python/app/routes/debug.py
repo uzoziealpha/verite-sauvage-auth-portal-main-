@@ -1,27 +1,32 @@
-from fastapi import APIRouter
-from web3 import Web3
+# backend-python/app/routes/debug.py
 
-from app.services.web3loader import get_web3
-from app.utils.settings import settings
+from fastapi import APIRouter
+from app.services.web3loader import get_web3, get_contract_debug_info
 
 router = APIRouter()
 
+@router.get("/artifact")
+def artifact():
+    """
+    Return the compiled contract artifact (ABI + networks).
+    """
+    from app.services.web3loader import CONTRACT_ARTIFACT
+    return CONTRACT_ARTIFACT
 
 @router.get("/contract")
 def debug_contract():
     """
-    Debug endpoint to verify RPC connection and contract deployment.
+    Try to inspect the contract on the configured RPC.
+    In production (Railway) this may not be deployed, so we
+    just return a friendly JSON instead of raising 500.
     """
-    web3 = get_web3()
-    chain_id = web3.eth.chain_id
-
-    address = Web3.to_checksum_address(settings.contract_address)
-    code = web3.eth.get_code(address)
-    has_code = code not in (b"", b"\x00", None)
-
-    return {
-        "rpc_url": settings.rpc_url,
-        "chain_id": chain_id,
-        "contract_address": address,
-        "has_code": has_code,
-    }
+    try:
+        web3 = get_web3()
+        info = get_contract_debug_info(web3)
+        return info
+    except Exception as e:
+        return {
+            "ok": False,
+            "error": str(e),
+            "hint": "This is expected if no contract is deployed at CONTRACT_ADDRESS on the configured RPC."
+        }
