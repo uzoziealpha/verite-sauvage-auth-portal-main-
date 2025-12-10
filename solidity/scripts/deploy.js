@@ -1,25 +1,17 @@
-// solidity/scripts/deploy.js
+// solidity/scripts/deploy.js// solidity/scripts/deploy.js
 const hre = require("hardhat");
-const fs = require("fs");
-const path = require("path");
 
 async function main() {
+  const network = await hre.ethers.provider.getNetwork();
+  console.log("Deploying FakeProdDetector to network:", network.name || network.chainId);
+
   const FakeProdDetector = await hre.ethers.getContractFactory("FakeProdDetector");
   const contract = await FakeProdDetector.deploy();
+
   await contract.waitForDeployment();
   const address = await contract.getAddress();
-  console.log("FakeProdDetector deployed to:", address);
 
-  // write artifact + address in a minimal format for backend/frontend use
-  const artifact = await hre.artifacts.readArtifact("FakeProdDetector");
-  const out = {
-    abi: artifact.abi,
-    networks: {}
-  };
-  // Hardhat localhost chainId is 31337
-  out.networks["31337"] = { address };
-  fs.mkdirSync(path.join(__dirname, "..", "dist"), { recursive: true });
-  fs.writeFileSync(path.join(__dirname, "..", "dist", "FakeProdDetector.json"), JSON.stringify(out, null, 2));
+  console.log("FakeProdDetector deployed to:", address);
 }
 
 main().catch((error) => {

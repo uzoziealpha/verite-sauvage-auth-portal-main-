@@ -1,9 +1,12 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
+# backend-python/app/main.py
+
 import os
 
-# Load .env
+from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+# Load .env from backend-python/.env
 load_dotenv()
 
 # Routers
@@ -13,11 +16,12 @@ from app.routes.verify import router as verify_router
 from app.routes.artifact import router as artifact_router
 from app.routes.debug import router as debug_router
 from app.routes.codes import router as codes_router
-from app.routes.customer_verify import router as customer_verify_router  # <- add this
+from app.routes.customer_verify import router as customer_verify_router
+
 
 app = FastAPI(title="Fake QR Code Detector API")
 
-# CORS (keep as you have it)
+# CORS — allow your local frontend + any extra you add in CORS_ORIGINS
 origins = [
     o.strip()
     for o in os.getenv(
@@ -35,27 +39,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/")
 def root():
+    """Simple index with a map of important endpoints."""
     return {
         "message": "Vérité Sauvage backend is running",
         "endpoints": {
             "health": "/health",
             "artifact": "/artifact",
-            "qr": "/qr/{product_id}.png",
-            "verify": "/verify/{product_id}",
+            "qr_png": "/qr/{product_id}.png",
+            "verify_admin": "/verify/{product_id}",
             "codes_register": "/codes/register",
             "codes_get": "/codes/{product_id}",
-            "customer_verify": "/customer-verify",
-            "debug": "/debug/*",
+            "customer_verify_post": "/customer-verify",
+            "customer_verify_get": "/customer-verify?code=VSXXXX",
+            "debug_contract": "/debug/contract",
         },
     }
 
-# Existing includes
+
+# Attach routers
 app.include_router(health_router)
 app.include_router(artifact_router, prefix="")
 app.include_router(qr_router, prefix="/qr")
 app.include_router(verify_router, prefix="/verify")
 app.include_router(codes_router, prefix="/codes")
-app.include_router(customer_verify_router, prefix="")  # <- this line is key
+app.include_router(customer_verify_router, prefix="")  # POST /customer-verify, GET /customer-verify
 app.include_router(debug_router, prefix="/debug")
