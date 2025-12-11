@@ -1,101 +1,120 @@
-# backend-python/app/services/web3loader.py
-
+import json
+import os
 from pathlib import Path
 from typing import Any, Dict
 
-import json
 from web3 import Web3
-from web3.contract import Contract
 
-from app.utils.settings import settings
+
+# --- Configuration ---
+
+# Default to local Hardhat for development
+RPC_URL: str = os.getenv("RPC_URL", "http://127.0.0.1:8545")
+
+# 31337 = Hardhat chain ID (Hardhat local)
+CHAIN_ID: int = int(os.getenv("CHAIN_ID", "31337"))
+
+# Resolve repo root:
+# web3loader.py -> services -> app -> backend-python -> REPO_ROOT
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
+# Path to the compiled contract artifact (from solidity build)
+ARTIFACT_PATH = (
+    REPO_ROOT
+    / "solidity"
+    / "artifacts"
+    / "contracts"
+    / "FakeProdDetector.sol"
+    / "FakeProdDetector.json"
+)
+
+if not ARTIFACT_PATH.exists():
+    raise RuntimeError(f"Contract artifact not found at: {ARTIFACT_PATH}")
+
+with ARTIFACT_PATH.open("r") as f:
+    CONTRACT_ARTIFACT = json.load(f)
+
+ABI = CONTRACT_ARTIFACT.get("abi")
+if not ABI:
+    raise RuntimeError("No ABI found in FakeProdDetector.json artifact")
+
+# Local default address from Hardhat network info, if present
+networks = CONTRACT_ARTIFACT.get("networks", {})
+local_address = None
+if str(CHAIN_ID) in networks:
+    local_address = networks[str(CHAIN_ID)].get("address")
+
+# Fallback to the classic Hardhat deterministic address
+if not local_address:
+    local_address = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+
+CONTRACT_ADDRESS: str = os.getenv("CONTRACT_ADDRESS", local_address)
+
+
+# --- Helpers ---
 
 
 def get_web3() -> Web3:
     """
-    Return a Web3 instance connected to the configured RPC URL.
+    Return a Web3 instance pointing at RPC_URL.
     """
-    rpc_url = settings.rpc_url
-    if not rpc_url:
-        raise RuntimeError("RPC_URL is not set. Check your backend .env file.")
-
-    web3 = Web3(Web3.HTTPProvider(rpc_url))
-
-    if not web3.is_connected():
-        raise RuntimeError(f"Unable to connect to RPC at {rpc_url}")
-
+    web3 = Web3(Web3.HTTPProvider(RPC_URL))
     return web3
 
 
-def _load_artifact() -> Dict[str, Any]:
+def get_contract(web3: Web3):
     """
-    Load the contract artifact JSON from the path in settings.CONTRACT_ARTIFACT.
-    Path may be relative to the backend root.
+    Return a Web3 contract instance for FakeProdDetector.
+    Raises if the address has no code.
     """
-    artifact_path = Path(settings.contract_artifact)
+    if not web3.is_connected():
+        raise RuntimeError(f"Cannot connect to RPC at {RPC_URL}")
 
-    # Resolve relative to backend root (backend-python/)
-    if not artifact_path.is_absolute():
-        backend_root = Path(__file__).resolve().parents[2]  # .../backend-python
-        artifact_path = backend_root / artifact_path
+    checksum_address = web3.to_checksum_address(CONTRACT_ADDRESS)
+    code = web3.eth.get_code(checksum_address)
 
-    if not artifact_path.exists():
-        raise RuntimeError(f"Contract artifact not found at: {artifact_path}")
-
-    with artifact_path.open("r", encoding="utf-8") as f:
-        artifact = json.load(f)
-
-    return artifact
-
-
-def _resolve_contract_address(web3: Web3, artifact: Dict[str, Any]) -> Web3:
-    """
-    Decide which contract address to use.
-
-    Priority:
-    1. CONTRACT_ADDRESS from settings (if non-empty).
-    2. Address from artifact.networks[chain_id].address.
-    """
-    raw_env_addr = (settings.contract_address or "").strip()
-
-    # 1) If CONTRACT_ADDRESS is set in .env and not blank, use that
-    if raw_env_addr:
-        return Web3.to_checksum_address(raw_env_addr)
-
-    # 2) Otherwise, fall back to artifact.networks[chainId].address
-    networks = artifact.get("networks") or {}
-    chain_id = web3.eth.chain_id
-    net_info = networks.get(str(chain_id))
-
-    if not net_info or "address" not in net_info:
+    if not code or len(code) == 0:
         raise RuntimeError(
-            f"No contract address found for chain_id {chain_id} in artifact "
-            f"and CONTRACT_ADDRESS env var is not set. "
-            f"Did you deploy the contract and copy the artifact?"
-        )
-
-    return Web3.to_checksum_address(net_info["address"])
-
-
-def get_contract(web3: Web3) -> Contract:
-    """
-    Return a web3 Contract instance using artifact + configured address.
-
-    Raises a helpful RuntimeError if there is no code at that address.
-    """
-    artifact = _load_artifact()
-    address = _resolve_contract_address(web3, artifact)
-
-    abi = artifact.get("abi")
-    if not abi:
-        raise RuntimeError("Artifact is missing 'abi' field.")
-
-    # Sanity check: is there code at that address?
-    code = web3.eth.get_code(address)
-    if code in (b"", b"\x00", None):
-        raise RuntimeError(
-            f"No contract code at {address} on {settings.rpc_url}. "
+            f"No contract code at {CONTRACT_ADDRESS} on {RPC_URL}. "
             f"Start your node and deploy the contract, or update CONTRACT_ADDRESS."
         )
 
-    contract = web3.eth.contract(address=address, abi=abi)
-    return contract
+    return web3.eth.contract(address=checksum_address, abi=ABI)
+
+
+def get_contract_debug_info() -> Dict[str, Any]:
+    """
+    Safe, non-throwing helper for /debug/contract.
+    Always returns a JSON-serializable dict, even if RPC or contract are broken.
+    """
+    info: Dict[str, Any] = {
+        "ok": False,
+        "error": None,
+        "rpc_url": RPC_URL,
+        "contract_address": CONTRACT_ADDRESS,
+        "has_code": False,
+        "code_hex_prefix": None,
+        "artifact_path": str(ARTIFACT_PATH),
+    }
+
+    try:
+        web3 = get_web3()
+        if not web3.is_connected():
+            info["error"] = f"Cannot connect to RPC at {RPC_URL}"
+            return info
+
+        checksum_address = web3.to_checksum_address(CONTRACT_ADDRESS)
+        code = web3.eth.get_code(checksum_address)
+
+        if code and len(code) > 0:
+            info["has_code"] = True
+            info["code_hex_prefix"] = code.hex()[:18]
+        else:
+            info["has_code"] = False
+            info["error"] = "No code at contract address"
+
+        info["ok"] = True
+        return info
+    except Exception as e:
+        info["error"] = str(e)
+        return info
