@@ -1,38 +1,17 @@
 // frontend/src/api.ts
 
-export const BACKEND =
-  import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:4000";
+import { BACKEND_BASE_URL } from "./config";
 
-const ADMIN_TOKEN = import.meta.env.VITE_ADMIN_TOKEN || "";
+// Base URL that the whole frontend uses for the backend
+export const BACKEND = BACKEND_BASE_URL;
 
-/**
- * JSON fetch helper with:
- *  - default headers
- *  - optional X-Admin-Token for admin endpoints
- *  - throws on non-2xx
- */
-export async function fetchJSON(
-  url: string,
-  options: RequestInit = {}
-): Promise<any> {
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
-    ...(options.headers || {}),
-  };
-
-  // Automatically attach admin token to protected routes
-  if (
-    (url.includes("/verify/") ||
-      url.includes("/codes") ||
-      url.includes("/debug")) &&
-    ADMIN_TOKEN
-  ) {
-    (headers as any)["X-Admin-Token"] = ADMIN_TOKEN;
-  }
-
+export async function fetchJSON(url: string, init?: RequestInit) {
   const res = await fetch(url, {
-    ...options,
-    headers,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers || {}),
+    },
+    ...init,
   });
 
   if (!res.ok) {
@@ -44,12 +23,9 @@ export async function fetchJSON(
 }
 
 /**
- * Fetch the compiled contract artifact (ABI + networks + address)
- * from the backend.
- *
- * Backend route: GET /artifact
+ * Fetch the contract artifact (ABI + networks) from the backend.
+ * Backend exposes this at GET /artifact.
  */
-export async function getArtifact(): Promise<any> {
+export async function getArtifact() {
   return fetchJSON(`${BACKEND}/artifact`);
 }
-
