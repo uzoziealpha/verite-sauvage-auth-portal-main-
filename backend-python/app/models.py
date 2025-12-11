@@ -1,10 +1,20 @@
-# backend-python/app/models.py
-from sqlalchemy import Column, String, DateTime, func
-from .db import Base
+from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, func
+from .database import Base
 
-class SecurityCode(Base):
-    __tablename__ = "security_codes"
 
-    product_id = Column(String(66), primary_key=True, index=True)  # 0x + 64
-    vs_code = Column(String(6), nullable=False, index=True)
+class Product(Base):
+    __tablename__ = "products"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(255), unique=True, index=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    collection = Column(String(255), nullable=True)
+    serial = Column(String(255), nullable=True)
+    description = Column(Text, nullable=True)
+    image_url = Column(String(512), nullable=True)
+    authentic = Column(Boolean, default=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

@@ -19,3 +19,4 @@ frontend/.env
 .DS_Store
 *.log
 backend-python/app/data/codes.json
+solidity/.env.save

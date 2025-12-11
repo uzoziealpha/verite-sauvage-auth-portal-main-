@@ -1,11 +1,8 @@
-// frontend/src/RegisterPanel.tsx
-
 import React, { useState } from "react";
 import Web3 from "web3";
 import QRCode from "qrcode";
 import { loadContract } from "./useContract";
-import { fetchJSON } from "./api";
-import { BACKEND_BASE_URL } from "./config";
+import { fetchJSON, BACKEND } from "./api";
 
 // Admin-side options for VS products
 const COLOR_OPTIONS = ["Elephant Gray", "Black", "White", "Brown"];
@@ -123,11 +120,8 @@ export default function RegisterPanel({
 
       // 5) Register a VS security code in codes.json via backend
       //    This ensures the customer /customer-verify flow will work.
-      console.log(
-        "[Admin] Calling /codes/register on",
-        `${BACKEND_BASE_URL}/codes/register`
-      );
-      const codeRes = await fetchJSON(`${BACKEND_BASE_URL}/codes/register`, {
+      console.log("[Admin] Calling /codes/register to store VS code…");
+      const codeRes = await fetchJSON(`${BACKEND}/codes/register`, {
         method: "POST",
         body: JSON.stringify({
           product_id: idHex,
@@ -135,6 +129,7 @@ export default function RegisterPanel({
       });
 
       const shortCode: string = codeRes.shortCode;
+
       console.log("[Admin] Stored VS code:", shortCode);
 
       // 6) Build public verify URL (for customer QR)
@@ -182,10 +177,10 @@ export default function RegisterPanel({
       )}
 
       <p style={{ fontSize: "0.85rem", color: "#6b7280", marginBottom: "1rem" }}>
-        This flow uses your MetaMask wallet to store a product fingerprint
-        on-chain and simultaneously register a private Vérité Sauvage security
-        code in the backend. A QR code is then generated that deep-links
-        customers to the official verification page.
+        This flow uses your MetaMask wallet to store a product fingerprint on-chain
+        and simultaneously register a private Vérité Sauvage security code in the
+        backend. A QR code is then generated that deep-links customers to the
+        official verification page.
       </p>
 
       {/* Name / Model */}

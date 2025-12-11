@@ -1,32 +1,40 @@
 # backend-python/app/routes/debug.py
 
 from fastapi import APIRouter
-from app.services.web3loader import get_web3, get_contract_debug_info
+from app.services.web3loader import get_web3, RPC_URL, CONTRACT_ADDRESS, ARTIFACT_PATH
 
 router = APIRouter()
 
-@router.get("/artifact")
-def artifact():
-    """
-    Return the compiled contract artifact (ABI + networks).
-    """
-    from app.services.web3loader import CONTRACT_ARTIFACT
-    return CONTRACT_ARTIFACT
 
-@router.get("/contract")
+@router.get("/debug/contract")
 def debug_contract():
     """
-    Try to inspect the contract on the configured RPC.
-    In production (Railway) this may not be deployed, so we
-    just return a friendly JSON instead of raising 500.
+    Safe debug endpoint for contract + RPC wiring.
+    It NEVER throws – even if RPC is down or contract is missing.
     """
+    info = {
+        "ok": True,
+        "rpc_url": RPC_URL,
+        "contract_address": CONTRACT_ADDRESS,
+        "artifact_path": ARTIFACT_PATH,
+        "has_code": False,
+        "code_hex_prefix": None,
+        "error": None,
+    }
+
     try:
         web3 = get_web3()
-        info = get_contract_debug_info(web3)
-        return info
     except Exception as e:
-        return {
-            "ok": False,
-            "error": str(e),
-            "hint": "This is expected if no contract is deployed at CONTRACT_ADDRESS on the configured RPC."
-        }
+        info["error"] = f"get_web3 failed: {e}"
+        return info
+
+    try:
+        code = web3.eth.get_code(CONTRACT_ADDRESS)
+        has_code = bool(code and code != b"")
+        info["has_code"] = has_code
+        if has_code:
+            info["code_hex_prefix"] = "0x" + code.hex()[:40]
+    except Exception as e:
+        info["error"] = f"eth_getCode failed: {e}"
+
+    return info
