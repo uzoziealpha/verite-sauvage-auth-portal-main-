@@ -21,11 +21,13 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 # In dev you can leave DATABASE_URL empty to use SQLite; in production (Railway)
 # you'll set DATABASE_URL in the environment to a Postgres connection string.
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./vs_codes.db")
+DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
+
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is not set or is empty")
 
 engine = create_engine(DATABASE_URL, future=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-
 Base = declarative_base()
 
 
