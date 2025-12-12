@@ -119,7 +119,7 @@ export default function VerifyPanel() {
           style={{ flex: 1, padding: "0.35rem 0.5rem" }}
         />
         <button onClick={go} disabled={busy}>
-          {busy ? "Checking…" : "Verify"}
+          {busy ? "Checking..." : "Verify"}
         </button>
       </div>
 

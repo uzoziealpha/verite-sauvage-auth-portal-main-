@@ -1,7 +1,7 @@
-// frontend/src/api.ts
+// src/api.ts
+import { BACKEND_BASE_URL } from "./config";
 
-export const BACKEND =
-  import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:4000";
+export const BACKEND = BACKEND_BASE_URL;
 
 const ADMIN_TOKEN = import.meta.env.VITE_ADMIN_TOKEN || "";
 

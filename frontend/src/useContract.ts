@@ -1,4 +1,4 @@
-// frontend/src/useContract.ts
+// src/useContract.ts
 
 import Web3 from "web3";
 import { getArtifact } from "./api";
@@ -14,7 +14,7 @@ export async function loadContract(web3: Web3) {
   // 2) Detect network ID from current web3 provider (MetaMask / Hardhat / etc.)
   const networkId = await web3.eth.net.getId();
 
-  // 3) Resolve contract address from artifact.networks
+  // 3) Try to find a matching deployed network in the artifact
   let address: string | undefined;
 
   if (artifact.networks && artifact.networks[networkId]) {

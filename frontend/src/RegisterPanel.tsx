@@ -108,23 +108,44 @@ export default function RegisterPanel({
 
       console.log("[Admin] productId:", idHex);
 
-      // 4) Load contract and send uploadProduct tx
-      const contract = await loadContract(web3);
+      // 4) Load contract and send uploadProduct tx (best effort)
+      let onChainOk = false;
+      try {
+        const contract = await loadContract(web3);
 
-      console.log("[Admin] Sending uploadProduct tx...");
-      await contract.methods
-        .uploadProduct(idHex, name, color, material, price, year)
-        .send({ from });
+        console.log("[Admin] Sending uploadProduct tx...");
+        await contract.methods
+          .uploadProduct(idHex, name, color, material, price, year)
+          .send({ from });
 
-      console.log("[Admin] uploadProduct tx confirmed.");
+        console.log("[Admin] uploadProduct tx confirmed.");
+        onChainOk = true;
+      } catch (chainErr: any) {
+        // Do NOT stop the flow; we still want to register code + QR.
+        console.error(
+          "[Admin] uploadProduct tx failed, continuing with off-chain registration only:",
+          chainErr
+        );
+      }
+
+      if (!onChainOk) {
+        console.log(
+          "[Admin] Proceeding without on-chain confirmation (node / contract may be offline)."
+        );
+      }
 
       // 5) Register a VS security code in codes.json via backend
-      //    This ensures the customer /customer-verify flow will work.
-      console.log("[Admin] Calling /codes/register to store VS code…");
+      //    This also stores clean product meta (model/color/material/price/year)
+      console.log("[Admin] Calling /codes/register to store VS code and meta...");
       const codeRes = await fetchJSON(`${BACKEND}/codes/register`, {
         method: "POST",
         body: JSON.stringify({
           product_id: idHex,
+          model: name,
+          color,
+          material,
+          price,
+          year,
         }),
       });
 
@@ -133,7 +154,7 @@ export default function RegisterPanel({
       console.log("[Admin] Stored VS code:", shortCode);
 
       // 6) Build public verify URL (for customer QR)
-      //    In production: https://www.verify.veritesauvage.com/verify?code=VSXXXX
+      //    In production: e.g. https://verify.veritesauvage.com/verify?code=VSXXXX
       const verifyUrl = `${PUBLIC_VERIFY_BASE}?code=${encodeURIComponent(
         shortCode
       )}`;
@@ -273,7 +294,7 @@ export default function RegisterPanel({
       {/* Submit */}
       <div className="row">
         <button className="primary" onClick={register} disabled={busy}>
-          {busy ? "Submitting…" : "Register + Generate QR"}
+          {busy ? "Submitting..." : "Register + Generate QR"}
         </button>
       </div>
 

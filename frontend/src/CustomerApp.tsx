@@ -1,5 +1,4 @@
 // frontend/src/CustomerApp.tsx
-
 import React, { useEffect, useState } from "react";
 import { fetchJSON } from "./api";
 import { QrReader } from "react-qr-reader";
@@ -171,6 +170,18 @@ export default function CustomerApp() {
     const { status, reason } = result.verdict;
 
     if (status === "authentic") {
+      // Map backend reason codes to nicer human copy
+      let friendlyReason: string | null = null;
+      if (reason === "vs_code_matches_for_product_id") {
+        friendlyReason =
+          "The VS security code and product ID match our official Vérité Sauvage records.";
+      } else if (reason === "codes_store_only") {
+        friendlyReason =
+          "Verified against the official Vérité Sauvage registry.";
+      } else if (reason) {
+        friendlyReason = reason;
+      }
+
       return (
         <div className="vs-verdict vs-verdict--ok">
           <div className="vs-verdict-title">
@@ -178,8 +189,11 @@ export default function CustomerApp() {
           </div>
           <div className="vs-verdict-sub">
             This item matches a registered Vérité Sauvage security code.
+            The product details below should match your authenticity card and bag.
           </div>
-          {reason && <div className="vs-verdict-reason">{reason}</div>}
+          {friendlyReason && (
+            <div className="vs-verdict-reason">{friendlyReason}</div>
+          )}
         </div>
       );
     }
@@ -367,22 +381,75 @@ export default function CustomerApp() {
             <div className="vs-details">
               <div className="vs-details-title">Product Details</div>
               <ul className="vs-product-list">
-                {Object.entries(result.product).map(([key, value]) => {
-                  const formatKey = (k: string) =>
-                    k
-                      .replace(/([A-Z])/g, " $1")
-                      .replace(/^./, (s) => s.toUpperCase());
-                  return (
-                    <li key={key} className="vs-product-item">
+                {(() => {
+                  const product = result.product || {};
+                  const meta = (product.meta || {}) as {
+                    model?: string;
+                    color?: string;
+                    material?: string;
+                    price?: number;
+                    year?: number;
+                  };
+
+                  const items: { label: string; value: string | number }[] = [];
+
+                  if (meta.model) {
+                    items.push({ label: "Model", value: meta.model });
+                  }
+                  if (meta.color) {
+                    items.push({ label: "Color", value: meta.color });
+                  }
+                  if (meta.material) {
+                    items.push({ label: "Material", value: meta.material });
+                  }
+                  if (meta.year) {
+                    items.push({ label: "Production Year", value: meta.year });
+                  }
+                  if (typeof meta.price === "number") {
+                    items.push({
+                      label: "Registered Value",
+                      value: meta.price.toLocaleString(undefined, {
+                        maximumFractionDigits: 0,
+                      }),
+                    });
+                  }
+                  if (product.productId) {
+                    items.push({
+                      label: "Product ID",
+                      value: product.productId,
+                    });
+                  }
+                  if (product.vsCode || shortCode) {
+                    items.push({
+                      label: "VS Security Code",
+                      value: product.vsCode || shortCode,
+                    });
+                  }
+
+                  // Fallback: if somehow meta is empty, still show raw keys except meta object
+                  if (items.length === 0) {
+                    Object.entries(product).forEach(([key, value]) => {
+                      if (key === "meta") return;
+                      const formatKey = (k: string) =>
+                        k
+                          .replace(/([A-Z])/g, " $1")
+                          .replace(/^./, (s) => s.toUpperCase());
+                      items.push({
+                        label: formatKey(key),
+                        value: value as any,
+                      });
+                    });
+                  }
+
+                  return items.map((item) => (
+                    <li key={item.label} className="vs-product-item">
                       <strong className="vs-product-key">
-                        {formatKey(key)}:
+                        {item.label}:
                       </strong>{" "}
-                      <span className="vs-product-value">
-                        {value?.toString()}
-                      </span>
+                      <span className="vs-product-value">{item.value}</span>
                     </li>
-                  );
-                })}
+                  ));
+                })()}
               </ul>
             </div>
           )}

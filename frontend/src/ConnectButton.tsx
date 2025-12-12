@@ -116,7 +116,7 @@ export default function ConnectButton({ onConnected }: Props) {
         <div style={{ display: "flex", gap: 8 }}>
           {!account && (
             <button onClick={connect} disabled={connecting}>
-              {connecting ? "Connecting…" : "Connect MetaMask"}
+              {connecting ? "Connecting..." : "Connect MetaMask"}
             </button>
           )}
           {account && (

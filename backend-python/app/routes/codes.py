@@ -2,107 +2,74 @@
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import Optional
-import secrets  # 👈 NEW
+from typing import Optional, Dict, Any
 
-from app.data.seed_codes import (
-    register_code_for_product,
-    get_short_code_for_product,
-)
+from app.data.seed_codes import register_code_for_product
 
 router = APIRouter()
 
 
 class CodeRegisterRequest(BaseModel):
-    product_id: str = Field(..., description="Product ID (0x + 64 hex)")
+  """
+  Called from the admin UI right after uploading a product on-chain.
+
+  We use this to:
+  - ensure a VS short code exists
+  - store clean product metadata in codes.json, like:
+
+    "0x....": {
+      "meta": {
+        "color": "White",
+        "material": "Crocodile",
+        "model": "Vérité Sauvage Petit",
+        "price": 18090,
+        "year": 2025
+      },
+      "shortCode": "VSR4A9"
+    }
+  """
+  product_id: str = Field(..., description="Product ID (0x + 64 hex)")
+  model: Optional[str] = Field(None, description="Model name, e.g. 'Vérité Sauvage Petit'")
+  color: Optional[str] = Field(None, description="Color")
+  material: Optional[str] = Field(None, description="Material")
+  price: Optional[int] = Field(None, description="Price as integer (e.g. 18090)")
+  year: Optional[int] = Field(None, description="Production year")
 
 
 @router.post("/register")
-def register_code(body: CodeRegisterRequest):
-    """
-    Admin endpoint: ensure a 6-character VS security code exists for this product.
+def register_code(body: CodeRegisterRequest) -> Dict[str, Any]:
+  """
+  Admin endpoint: ensure a VS security code exists and persist clean meta.
 
-    - If code already exists: return it.
-    - If not: generate new, persist, and return it.
-    """
-    pid = body.product_id.strip()
-    try:
-        short_code = register_code_for_product(pid)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+  We only store these fields in meta:
+  - color
+  - material
+  - model
+  - price
+  - year
+  """
+  pid = body.product_id.strip()
 
-    return {
-        "success": True,
-        "productId": pid,
-        "shortCode": short_code,
-    }
+  # Build the meta exactly like you want it in codes.json
+  raw_meta = {
+    "model": body.model,
+    "color": body.color,
+    "material": body.material,
+    "price": body.price,
+    "year": body.year,
+  }
 
+  # Remove None values so we do not get nulls in JSON
+  meta = {k: v for k, v in raw_meta.items() if v is not None}
 
-@router.get("/{product_id}")
-def get_code(product_id: str):
-    """Admin helper: fetch the stored VS security code for a product ID."""
-    code = get_short_code_for_product(product_id)
-    if not code:
-        raise HTTPException(status_code=404, detail="No code stored for this productId")
-    return {
-        "success": True,
-        "productId": product_id,
-        "shortCode": code,
-    }
+  try:
+    short_code = register_code_for_product(pid, meta=meta)
+  except ValueError as e:
+    raise HTTPException(status_code=400, detail=str(e))
 
-
-# ================== NEW: auto-generate productId + code =====================
-
-
-class CodeAutoRegisterRequest(BaseModel):
-    """
-    New simple admin request:
-    You can pass bag metadata if you want for later use.
-    For now it's just echoed back; the important part is productId + code.
-    """
-    serial: Optional[str] = Field(None, description="Bag serial / internal SKU")
-    model: Optional[str] = Field(None, description="Bag model / name")
-    color: Optional[str] = None
-    size: Optional[str] = None
-    year: Optional[int] = None
-    material: Optional[str] = None
-
-
-@router.post("/register-auto")
-def register_code_auto(body: CodeAutoRegisterRequest):
-    """
-    New admin endpoint:
-
-    - Generates a new random productId (0x + 64 hex)
-    - Uses seed_codes.register_code_for_product to create a VS code
-      and store it in codes.json
-    - Returns productId + shortCode and a suggested QR path
-    """
-
-    # 32 random bytes -> 64 hex chars, plus 0x prefix
-    product_id = "0x" + secrets.token_hex(32)
-
-    try:
-        short_code = register_code_for_product(product_id)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to register code: {e}")
-
-    # Frontend / label can turn this into a full URL using the backend or frontend domain
-    qr_path = f"/customer-verify?code={short_code}"
-
-    return {
-        "success": True,
-        "productId": product_id,
-        "shortCode": short_code,
-        "qrPath": qr_path,
-        "meta": {
-            "serial": body.serial,
-            "model": body.model,
-            "color": body.color,
-            "size": body.size,
-            "year": body.year,
-            "material": body.material,
-        },
-    }
+  return {
+    "success": True,
+    "productId": pid,
+    "shortCode": short_code,
+    "meta": meta,
+  }

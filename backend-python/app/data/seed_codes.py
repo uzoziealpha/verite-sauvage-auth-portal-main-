@@ -1,12 +1,23 @@
 # backend-python/app/data/seed_codes.py
 
-"""Utility for storing Vérité Sauvage security codes and metadata on disk.
+"""
+Utility for storing Vérité Sauvage security codes and metadata on disk.
 
 We keep a JSON mapping of::
 
     productId (0x + 64 hex) -> {
         "shortCode": "VS2BOF",
-        "meta": { ... optional bag metadata ... }
+        "meta": { ... optional bag metadata ... },
+        "createdAt": "<ISO timestamp>",
+        "history": [
+            {
+                "at": "<ISO timestamp>",
+                "source": "admin" | "customer",
+                "verdict": "authentic" | "fake",
+                "details": { ... optional extra ... }
+            },
+            ...
+        ]
     }
 
 For backward-compatibility with older data, we also support the legacy shape::
@@ -14,31 +25,26 @@ For backward-compatibility with older data, we also support the legacy shape::
     productId -> "VS2BOF"
 
 The JSON file lives next to this module as ``codes.json`` so that it is
-easy to back up or inspect:
-
-    app/data/codes.json
-
-Public functions:
-
-    * register_code_for_product(pid, meta=None) -> str
-    * get_short_code_for_product(pid) -> Optional[str]
-    * get_meta_for_product(pid) -> Dict[str, Any]
-    * check_short_code(pid, code) -> bool
+easy to inspect or back up.
 """
 
-from __future__ import annotations
-
+from pathlib import Path
+from typing import Dict, Any, Optional
 import json
 import os
-import random
-from pathlib import Path
-from typing import Any, Dict, Optional
+import re
+import secrets
+from datetime import datetime, timezone
 
-HERE = Path(__file__).parent
-CODES_FILE = HERE / "codes.json"
+CODES_FILE = Path(__file__).with_name("codes.json")
 
-# Allowed characters for VS codes (excluding confusing ones)
-ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"  # no 0,1,I,O,L
+# We avoid ambiguous characters like 0,1,I,O,L
+ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
+
+
+# ---------------------------------------------------------------------------
+# Low-level helpers
+# ---------------------------------------------------------------------------
 
 
 def _load_codes() -> Dict[str, Any]:
@@ -59,7 +65,6 @@ def _load_codes() -> Dict[str, Any]:
 def _save_codes(codes: Dict[str, Any]) -> None:
     """Persist the mapping to JSON file in a safe way."""
     os.makedirs(CODES_FILE.parent, exist_ok=True)
-
     tmp_path = CODES_FILE.with_suffix(".tmp")
     with tmp_path.open("w", encoding="utf-8") as f:
         json.dump(codes, f, indent=2, sort_keys=True)
@@ -67,44 +72,41 @@ def _save_codes(codes: Dict[str, Any]) -> None:
 
 
 def _normalise_pid(pid: str) -> str:
-    """Normalise and validate a productId.
+    """
+    Normalise and validate a productId.
 
     * must be a string
-    * must start with '0x'
-    * must be exactly 0x + 64 hex characters
-    * we always store it in lowercase
+    * must start with "0x"
+    * must contain exactly 64 hex characters after 0x
     """
     if not isinstance(pid, str):
-        raise ValueError("product_id must be a string")
-
+        raise ValueError("productId must be a string")
     pid = pid.strip()
-    if not pid.startswith("0x") or len(pid) != 66:
-        raise ValueError("product_id must be 0x + 64 hex characters.")
+    if not pid.startswith("0x"):
+        raise ValueError("productId must start with 0x")
+    if len(pid) != 66:
+        raise ValueError("productId must be 0x + 64 hex characters")
+    if not re.fullmatch(r"0x[0-9a-fA-F]{64}", pid):
+        raise ValueError("productId must be 0x + 64 hex characters")
+    return pid.lower()
 
-    hex_part = pid[2:]
-    int(hex_part, 16)  # will raise ValueError if not valid hex
-    return "0x" + hex_part.lower()
 
-
-def _generate_short_code() -> str:
-    """Generate a new 6-character VS security code.
-
-    Always starts with "VS" and uses the ALPHABET above for the suffix.
-    """
-    suffix = "".join(random.choice(ALPHABET) for _ in range(4))
-    return "VS" + suffix
+def _generate_short_code(length: int = 6) -> str:
+    """Generate a random VS security code like VSAB12 or similar."""
+    # Prefix 'VS' + 4 random characters by default
+    body = "".join(secrets.choice(ALPHABET) for _ in range(length - 2))
+    return "VS" + body
 
 
 def _extract_short_code(value: Any) -> Optional[str]:
-    """Given a stored value (string or object), return the short code if present."""
+    """Extract shortCode from either the new dict shape or legacy string."""
+    if isinstance(value, dict):
+        sc = value.get("shortCode")
+        if isinstance(sc, str):
+            return sc
+        return None
     if isinstance(value, str):
         return value
-    if isinstance(value, dict):
-        # support multiple field names just in case
-        for key in ("shortCode", "vsCode", "code"):
-            code = value.get(key)
-            if isinstance(code, str) and code:
-                return code
     return None
 
 
@@ -117,40 +119,49 @@ def _extract_meta(value: Any) -> Dict[str, Any]:
     return {}
 
 
-def register_code_for_product(pid: str, meta: Optional[Dict[str, Any]] = None) -> str:
-    """Ensure a VS code exists for this productId, optionally attaching metadata.
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+
+def register_code_for_product(
+    pid: str, meta: Optional[Dict[str, Any]] = None
+) -> str:
+    """
+    Ensure a VS code exists for this productId, optionally attaching metadata.
 
     - Normalises and validates pid
     - If pid already has a code, returns the existing code and merges meta (if given)
-    - If not, generates a fresh VS***** code, stores it, and returns it
+    - If not, generates a fresh VS**** code, stores it, and returns it
     """
     key = _normalise_pid(pid)
     codes = _load_codes()
 
-    existing = codes.get(key)
-    if existing is not None:
-        # Already have an entry; keep its code, merge any new meta
-        short_code = _extract_short_code(existing)
-        if short_code is None:
-            # weird/invalid entry -> generate a new one but keep meta if present
-            existing_meta = _extract_meta(existing)
-            if meta:
-                existing_meta.update(meta)
-            short_code = _generate_short_code()
-            codes[key] = {"shortCode": short_code, "meta": existing_meta}
-            _save_codes(codes)
-            return short_code
+    entry = codes.get(key)
 
-        # Normal case: valid existing code
-        existing_meta = _extract_meta(existing)
-        if meta:
-            existing_meta.update(meta)
+    short_code: Optional[str] = None
 
-        # Store back in normalised object form
-        codes[key] = {
-            "shortCode": short_code,
-            "meta": existing_meta,
-        }
+    if isinstance(entry, str):
+        # Legacy: just "VS2BOF"
+        short_code = entry
+        entry = {"shortCode": short_code}
+    elif isinstance(entry, dict):
+        short_code = _extract_short_code(entry)
+    else:
+        entry = {}
+
+    # Merge metadata if provided
+    if meta:
+        existing_meta = entry.get("meta")
+        if isinstance(existing_meta, dict):
+            merged = {**existing_meta, **meta}
+        else:
+            merged = dict(meta)
+        entry["meta"] = merged
+
+    # If we already have a shortCode, just persist merged meta and return
+    if short_code:
+        codes[key] = entry
         _save_codes(codes)
         return short_code
 
@@ -167,16 +178,17 @@ def register_code_for_product(pid: str, meta: Optional[Dict[str, Any]] = None) -
         short_code = _generate_short_code()
         guard += 1
 
-    codes[key] = {
-        "shortCode": short_code,
-        "meta": dict(meta) if meta else {},
-    }
+    entry["shortCode"] = short_code
+    entry.setdefault("meta", {})
+    entry["createdAt"] = datetime.now(timezone.utc).isoformat()
+
+    codes[key] = entry
     _save_codes(codes)
     return short_code
 
 
 def get_short_code_for_product(pid: str) -> Optional[str]:
-    """Return the stored 6-character code for a given productId, or None."""
+    """Return the shortCode for a given productId, if any."""
     try:
         key = _normalise_pid(pid)
     except ValueError:
@@ -187,7 +199,7 @@ def get_short_code_for_product(pid: str) -> Optional[str]:
 
 
 def get_meta_for_product(pid: str) -> Dict[str, Any]:
-    """Return stored metadata for a given productId (may be empty)."""
+    """Return meta dict for a given productId, or {} if none."""
     try:
         key = _normalise_pid(pid)
     except ValueError:
@@ -203,3 +215,46 @@ def check_short_code(pid: str, code: str) -> bool:
     if not stored:
         return False
     return stored.lower() == str(code).strip().lower()
+
+
+def append_verification_event(
+    pid: str,
+    source: str,
+    verdict: str,
+    details: Optional[Dict[str, Any]] = None,
+) -> None:
+    """
+    Append a verification event into codes.json for analytics / traceability.
+
+    - source: "admin" or "customer"
+    - verdict: "authentic" or "fake"
+    """
+    try:
+        key = _normalise_pid(pid)
+    except ValueError:
+        return
+
+    codes = _load_codes()
+    entry = codes.get(key)
+
+    if isinstance(entry, str):
+        entry = {"shortCode": entry}
+    elif not isinstance(entry, dict):
+        entry = {}
+
+    history = entry.get("history")
+    if not isinstance(history, list):
+        history = []
+
+    event: Dict[str, Any] = {
+        "at": datetime.now(timezone.utc).isoformat(),
+        "source": source,
+        "verdict": verdict,
+    }
+    if details:
+        event["details"] = details
+
+    history.append(event)
+    entry["history"] = history
+    codes[key] = entry
+    _save_codes(codes)

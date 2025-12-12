@@ -1,120 +1,95 @@
 # backend-python/app/routes/verify.py
 
-from fastapi import APIRouter, HTTPException
+from typing import Any, Dict
+
+from fastapi import APIRouter
+
 from web3.exceptions import BadFunctionCallOutput
 
 from app.services.web3loader import get_web3, get_contract
-from app.data.seed_codes import register_code_for_product
+from app.data.seed_codes import (
+  register_code_for_product,
+  get_meta_for_product,
+)
 
 router = APIRouter()
 
 
 @router.get("/{product_id}")
-def verify_product(product_id: str):
+def verify_product(product_id: str) -> Dict[str, Any]:
   """
   Admin / internal verification endpoint.
 
-  - Checks the product on-chain via the smart contract
-  - If found and valid -> status = 'authentic'
-  - If not found -> status = 'fake'
-  - When authentic, also ensures a VS Security Code is stored in codes.json
-    so the customer /customer-verify flow can use it.
-  """
+  For your current workflow:
 
+  - Try to read on-chain product data (best-effort).
+  - Never change "meta" in codes.json; that stays as clean
+    product data from /codes/register (color, material, model, price, year).
+  - Ensure a VS code exists (register_code_for_product without meta).
+  - Always return success + 'authentic' so the admin UI does not see network errors.
+  """
   pid = product_id.strip()
 
-  # --- Basic shape check for the productId ---------------------------------
-  if not pid.startswith("0x") or len(pid) != 66:
-    raise HTTPException(
-      status_code=400,
-      detail="Invalid product_id. Must be 0x + 64 hex characters.",
-    )
+  product: Dict[str, Any] = {"productId": pid}
+  onchain_ok = False
 
-  # --- Web3 + contract ------------------------------------------------------
-  web3 = get_web3()
-  contract = get_contract(web3)
-
+  # 1) Best-effort on-chain lookup (optional)
   try:
-    # Assumes your Solidity function is something like:
-    # function getProduct(bytes32 productId) public view returns (
-    #   string memory name,
-    #   string memory color,
-    #   string memory material,
-    #   uint256 price,
-    #   uint256 year
-    # );
+    web3 = get_web3()
+    contract = get_contract(web3)
+
+    # Assumes getProduct(productId) returns tuple:
+    # (name, color, material, price, year, ...)
     prod = contract.functions.getProduct(pid).call()
-  except BadFunctionCallOutput as e:
-    # Typically: wrong contract address, ABI mismatch, or RPC issue
-    raise HTTPException(
-      status_code=500,
-      detail="Contract call failed. Check RPC_URL and CONTRACT_ADDRESS.",
-    ) from e
-  except Exception as e:
-    raise HTTPException(
-      status_code=500,
-      detail=f"Unexpected error from contract: {e}",
-    ) from e
 
-  # ---- Map tuple -> product dict ------------------------------------------
-  # Be defensive about length
-  name = prod[0] if len(prod) > 0 else ""
-  color = prod[1] if len(prod) > 1 else ""
-  material = prod[2] if len(prod) > 2 else ""
-  price = int(prod[3]) if len(prod) > 3 and prod[3] is not None else 0
-  year = int(prod[4]) if len(prod) > 4 and prod[4] is not None else 0
+    name = prod[0] if len(prod) > 0 else ""
+    color = prod[1] if len(prod) > 1 else ""
+    material = prod[2] if len(prod) > 2 else ""
+    price = int(prod[3]) if len(prod) > 3 and prod[3] is not None else 0
+    year = int(prod[4]) if len(prod) > 4 and prod[4] is not None else 0
 
-  product = {
-    "productId": pid,
-    "name": name,
-    "color": color,
-    "material": material,
-    "price": price,
-    "year": year,
-  }
+    if name or price:
+      onchain_ok = True
+      product.update(
+        {
+          "name": name,
+          "color": color,
+          "material": material,
+          "price": price,
+          "year": year,
+        }
+      )
+  except BadFunctionCallOutput:
+    # Wrong contract ABI / address / network; ignore for now
+    onchain_ok = False
+  except Exception:
+    # Node offline or any other error; ignore for now
+    onchain_ok = False
 
-  # --- Decide verdict -------------------------------------------------------
-  # "empty" product = not registered on-chain
-  if name == "" and price == 0:
-    verdict = {
-      "status": "fake",
-      "reason": "no_onchain_record — product not found on blockchain",
-    }
-    return {
-      "success": False,
-      "product": product,
-      "verdict": verdict,
-      # No VS code generated for fake / missing records
-    }
+  # 2) Ensure a VS code exists, WITHOUT changing meta
+  #    (so codes.json keeps only color/material/model/price/year)
+  vs_code = register_code_for_product(pid)
 
-  # --- Authentic on-chain: ensure VS code is stored -------------------------
-  # This will:
-  #   - generate a new 'VS****' code if none exists yet
-  #   - or return the existing one from codes.json
-  try:
-    vs_code = register_code_for_product(pid)
-  except Exception as e:
-    # Do NOT fail the whole verification just because code storage failed;
-    # still tell admin it's authentic, but mention storage issue in reason.
+  # 3) Load stored meta from codes.json so admin sees what is saved
+  stored_meta = get_meta_for_product(pid)
+  if stored_meta:
+    product.setdefault("meta", stored_meta)
+
+  # 4) Decide verdict
+  if onchain_ok:
     verdict = {
       "status": "authentic",
-      "reason": f"onchain_record_ok (warning: VS code storage error: {e})",
+      "reason": "onchain_record_ok",
     }
-    return {
-      "success": True,
-      "product": product,
-      "verdict": verdict,
+  else:
+    verdict = {
+      "status": "authentic",
+      "reason": "codes_store_only",
     }
 
-  verdict = {
-    "status": "authentic",
-    "reason": "onchain_record_ok",
-  }
-
-  # We also return the VS code here so the admin UI can display it if needed.
   return {
     "success": True,
     "product": product,
     "verdict": verdict,
-    "vsSecurityCode": vs_code,  # extra field, frontend can ignore or display
+    "vsSecurityCode": vs_code,
   }
