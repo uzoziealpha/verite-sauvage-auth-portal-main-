@@ -20,3 +20,4 @@ frontend/.env
 *.log
 backend-python/app/data/codes.json
 solidity/.env.save
+backend-python/vs_codes.db
